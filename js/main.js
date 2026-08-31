@@ -1,4 +1,4 @@
-﻿/* 五子棋界面：Canvas 渲染、交互、人机/双人模式 */
+/* 五子棋界面：Canvas 渲染、交互、人机/双人模式 */
 (function () {
   'use strict';
 
@@ -75,6 +75,127 @@
   wins[WHITE] = 0;
   wins.draw = 0;
   let aiTimer = null;
+
+  // ---------- 棋子颜色系统 ----------
+  const PRESET_COLORS = ['#1a1a1a', '#f5f5f5', '#e74c3c', '#3498db', '#2ecc71', '#9b59b6', '#f39c12', '#1abc9c'];
+  const DEFAULT_COLORS = { 1: '#1a1a1a', 2: '#f5f5f5' };
+  let stoneColors = loadStoneColors();
+
+  function loadStoneColors() {
+    try {
+      const saved = localStorage.getItem('gomoku_stone_colors');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { 1: parsed[1] || DEFAULT_COLORS[1], 2: parsed[2] || DEFAULT_COLORS[2] };
+      }
+    } catch (e) {}
+    return Object.assign({}, DEFAULT_COLORS);
+  }
+
+  function saveStoneColors() {
+    try { localStorage.setItem('gomoku_stone_colors', JSON.stringify(stoneColors)); } catch (e) {}
+  }
+
+  function hexToRgb(hex) {
+    const h = hex.replace('#', '');
+    return {
+      r: parseInt(h.substring(0, 2), 16),
+      g: parseInt(h.substring(2, 4), 16),
+      b: parseInt(h.substring(4, 6), 16)
+    };
+  }
+
+  function rgbToHex(rgb) {
+    return '#' + [rgb.r, rgb.g, rgb.b]
+      .map(function (v) { return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0'); })
+      .join('');
+  }
+
+  function lighten(hex, amount) {
+    const rgb = hexToRgb(hex);
+    return rgbToHex({
+      r: rgb.r + (255 - rgb.r) * amount,
+      g: rgb.g + (255 - rgb.g) * amount,
+      b: rgb.b + (255 - rgb.b) * amount
+    });
+  }
+
+  function darken(hex, amount) {
+    const rgb = hexToRgb(hex);
+    return rgbToHex({ r: rgb.r * (1 - amount), g: rgb.g * (1 - amount), b: rgb.b * (1 - amount) });
+  }
+
+  function stoneGradient(hex) {
+    return { light: lighten(hex, 0.35), mid: hex, dark: darken(hex, 0.35) };
+  }
+
+  function isLightColor(hex) {
+    const rgb = hexToRgb(hex);
+    return (rgb.r * 0.299 + rgb.g * 0.587 + rgb.b * 0.114) > 160;
+  }
+
+  function applyStoneStyle(el, player) {
+    const hex = stoneColors[player];
+    const grad = stoneGradient(hex);
+    el.style.background = 'radial-gradient(circle at 32% 30%, ' + grad.light + ', ' + grad.dark + ' 75%)';
+    if (isLightColor(hex)) {
+      el.style.border = '1px solid rgba(0,0,0,0.2)';
+      el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.25)';
+    } else {
+      el.style.border = 'none';
+      el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.5)';
+    }
+  }
+
+  function initColorPickers() {
+    const groupBlack = document.getElementById('swatchGroupBlack');
+    const groupWhite = document.getElementById('swatchGroupWhite');
+    const customBlack = document.getElementById('customColorBlack');
+    const customWhite = document.getElementById('customColorWhite');
+
+    [groupBlack, groupWhite].forEach(function (group, idx) {
+      const player = idx === 0 ? 1 : 2;
+      PRESET_COLORS.forEach(function (hex) {
+        const btn = document.createElement('button');
+        btn.className = 'swatch';
+        btn.style.background = hex;
+        btn.setAttribute('data-color', hex);
+        btn.setAttribute('data-player', player);
+        btn.title = hex;
+        group.appendChild(btn);
+      });
+    });
+
+    groupBlack.addEventListener('click', function (e) {
+      if (e.target.classList.contains('swatch')) setStoneColor(1, e.target.getAttribute('data-color'));
+    });
+    groupWhite.addEventListener('click', function (e) {
+      if (e.target.classList.contains('swatch')) setStoneColor(2, e.target.getAttribute('data-color'));
+    });
+    customBlack.addEventListener('input', function () { setStoneColor(1, this.value); });
+    customWhite.addEventListener('input', function () { setStoneColor(2, this.value); });
+
+    refreshSwatchActive();
+  }
+
+  function setStoneColor(player, hex) {
+    stoneColors[player] = hex;
+    saveStoneColors();
+    refreshSwatchActive();
+    draw();
+    updateStatus();
+  }
+
+  function refreshSwatchActive() {
+    document.querySelectorAll('.swatch').forEach(function (btn) {
+      const player = parseInt(btn.getAttribute('data-player'));
+      btn.classList.toggle('active', btn.getAttribute('data-color') === stoneColors[player]);
+    });
+    document.getElementById('customColorBlack').value = stoneColors[1];
+    document.getElementById('customColorWhite').value = stoneColors[2];
+    applyStoneStyle(document.getElementById('scoreDotBlack'), 1);
+    applyStoneStyle(document.getElementById('scoreDotWhite'), 2);
+  }
 
   // ---------- 音频 ----------
   let audioCtx = null;
@@ -188,21 +309,17 @@
     const radius = CELL * 0.44;
     ctx.save();
     ctx.globalAlpha = alpha;
+    const hex = stoneColors[color] || DEFAULT_COLORS[color];
+    const g = stoneGradient(hex);
     const grad = ctx.createRadialGradient(x - radius * 0.35, y - radius * 0.4, radius * 0.15, x, y, radius);
-    if (color === BLACK) {
-      grad.addColorStop(0, '#7a7a7a');
-      grad.addColorStop(0.35, '#3a3a3a');
-      grad.addColorStop(1, '#0a0a0a');
-    } else {
-      grad.addColorStop(0, '#ffffff');
-      grad.addColorStop(0.6, '#f0f0f0');
-      grad.addColorStop(1, '#c2c2c2');
-    }
+    grad.addColorStop(0, g.light);
+    grad.addColorStop(0.4, g.mid);
+    grad.addColorStop(1, g.dark);
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fillStyle = grad;
     ctx.fill();
-    ctx.strokeStyle = color === BLACK ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.25)';
+    ctx.strokeStyle = isLightColor(hex) ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.4)';
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.restore();
@@ -364,8 +481,8 @@
         text = '平局';
         msg = '棋盘已满，双方不分胜负';
       } else {
-        const colorName = game.winner === BLACK ? '黑方' : '白方';
-        stone.className = 'stone ' + (game.winner === BLACK ? 'stone-black' : 'stone-white');
+        const colorName = game.winner === BLACK ? '先手方' : '后手方';
+        stone.className = 'stone'; applyStoneStyle(stone, game.winner);
         if (mode === 'ai') {
           const humanWon = game.winner === humanColor;
           text = humanWon ? '🎉 你赢了！' : '🤖 电脑获胜';
@@ -377,13 +494,13 @@
       }
     } else {
       const isHumanTurn = mode !== 'ai' || game.currentPlayer === humanColor;
-      const colorName = game.currentPlayer === BLACK ? '黑方' : '白方';
-      stone.className = 'stone ' + (game.currentPlayer === BLACK ? 'stone-black' : 'stone-white');
+      const colorName = game.currentPlayer === BLACK ? '先手方' : '后手方';
+      stone.className = 'stone'; applyStoneStyle(stone, game.currentPlayer);
       stone.classList.toggle('thinking', !isHumanTurn);
       if (mode === 'ai') {
         text = isHumanTurn ? '你的回合' : '电脑思考中…';
         msg = isHumanTurn
-          ? '你执' + (game.currentPlayer === BLACK ? '黑棋' : '白棋') + '，请点击棋盘落子'
+          ? '请点击棋盘落子'
           : '请稍候，电脑正在计算…';
       } else {
         text = colorName + '回合';
@@ -429,6 +546,7 @@
   });
 
   // ---------- 启动 ----------
+  initColorPickers();
   updateWins();
   updateStatus();
   draw();
