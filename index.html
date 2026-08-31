@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>落子 · 五子棋</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">落</span><div><h1>落子</h1><p>五子棋 · 经典对弈</p></div></div>
+      <div class="top-actions"><button class="icon-btn" id="undoBtn" title="悔棋" aria-label="悔棋">↶</button><button class="icon-btn" id="resetBtn" title="重新开始" aria-label="重新开始">↻</button></div>
+    </header>
+    <section class="game-layout">
+      <section class="board-panel">
+        <div class="board-head"><div><span class="eyebrow">CURRENT MATCH</span><h2 id="statusTitle">黑方回合</h2></div><div class="turn-chip"><span class="turn-dot black" id="turnDot"></span><span id="turnLabel">BLACK</span></div></div>
+        <div class="board-wrap"><canvas id="board" aria-label="五子棋棋盘"></canvas></div>
+        <div class="board-foot"><span id="moveCount">第 0 手</span><span class="hint">横、竖、斜线连成五子获胜</span></div>
+      </section>
+      <aside class="side-panel">
+        <div class="mode-section"><span class="eyebrow">GAME MODE</span><div class="segmented"><button class="mode active" data-mode="pvp">双人对弈</button><button class="mode" data-mode="ai">人机挑战</button></div></div>
+        <div class="score-section"><span class="eyebrow">SCOREBOARD</span><div class="score-row"><div class="player"><span class="stone black"></span><div><strong>黑方</strong><small id="blackName">PLAYER 1</small></div></div><b id="blackScore">0</b></div><div class="score-row"><div class="player"><span class="stone white"></span><div><strong>白方</strong><small id="whiteName">PLAYER 2</small></div></div><b id="whiteScore">0</b></div></div>
+        <div class="history-section"><div class="section-title"><span class="eyebrow">MOVE HISTORY</span><span class="count" id="historyCount">0</span></div><ol id="history"></ol></div>
+        <button class="primary-btn" id="newGameBtn"><span>＋</span> 新开一局</button>
+        <p class="footer-note">15 × 15 标准棋盘<br/>先手黑方 · 禁手规则未启用</p>
+      </aside>
+    </section>
+  </main>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
