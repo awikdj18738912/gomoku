@@ -54,6 +54,9 @@ body {
 
 .panel h2 { font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: 2px; margin-bottom: 10px; }
 
+.type-buttons { display: flex; gap: 10px; }
+.type-buttons .btn { flex: 1; }
+
 .mode-buttons { display: flex; gap: 10px; }
 .mode-buttons .btn { flex: 1; }
 

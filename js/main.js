@@ -5,6 +5,8 @@
   const { GomokuGame, EMPTY, BLACK, WHITE } = window.GomokuGame;
   let BOARD_SIZE = window.GomokuGame.BOARD_SIZE;
   const { getBestMove } = window.GomokuAI;
+  const { GoGame } = window.GoGame;
+  const { getGoMove } = window.GoAI;
 
   // ---------- 画布 ----------
   const canvas = document.getElementById('boardCanvas');
@@ -65,8 +67,24 @@
   const pickWhite = document.getElementById('pickWhite');
   const colorPick = document.getElementById('colorPick');
   const soundToggle = document.getElementById('soundToggle');
+  const typeGomoku = document.getElementById('typeGomoku');
+  const typeGo = document.getElementById('typeGo');
+  const gomokuSection = document.getElementById('gomokuSection');
+  const goSection = document.getElementById('goSection');
+  const goModeAI = document.getElementById('goModeAI');
+  const goModePVP = document.getElementById('goModePVP');
+  const goPickBlack = document.getElementById('goPickBlack');
+  const goPickWhite = document.getElementById('goPickWhite');
+  const goColorPick = document.getElementById('goColorPick');
+  const gomokuScores = document.getElementById('gomokuScores');
+  const goCapturesEl = document.getElementById('goCaptures');
+  const goBlackCapturesEl = document.getElementById('goBlackCaptures');
+  const goWhiteCapturesEl = document.getElementById('goWhiteCaptures');
+  const passBtn = document.getElementById('passBtn');
+  const resignBtn = document.getElementById('resignBtn');
 
   // ---------- 状态 ----------
+  let gameType = 'gomoku';  // 'gomoku' | 'go'
   let mode = 'ai';          // 'ai' | 'pvp'
   let humanColor = BLACK;   // 玩家执黑/执白
   let game = new GomokuGame();
@@ -296,6 +314,21 @@
       }
     }
 
+    // 围棋终局领地标示
+    if (gameType === 'go' && game.gameOver && game.scoreResult) {
+      for (const p of game.scoreResult.territoryMap) {
+        const x = PAD + p.col * CELL;
+        const y = PAD + p.row * CELL;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = p.owner === BLACK ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.75)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+    }
+
     // 获胜连线
     if (game.winningLine) {
       const line = game.winningLine.line;
@@ -419,9 +452,19 @@
     aiTimer = null;
     if (game.winner !== null) return;
     const aiPlayer = game.currentPlayer;
-    const best = getBestMove(game.board, aiPlayer, humanColor);
-    const move = game.place(best.row, best.col);
-    if (!move) return;
+
+    if (gameType === 'go') {
+      const mv = getGoMove(game);
+      if (mv.pass) {
+        game.pass();
+      } else {
+        game.place(mv.row, mv.col);
+      }
+    } else {
+      const best = getBestMove(game.board, aiPlayer, humanColor);
+      game.place(best.row, best.col);
+    }
+
     playSound('place');
     updateStatus();
     draw();
@@ -442,9 +485,10 @@
       clearTimeout(aiTimer);
       aiTimer = null;
     }
-    game = new GomokuGame();
+    game = gameType === 'go' ? new GoGame(BOARD_SIZE) : new GomokuGame();
     thinking = false;
     hover = null;
+    updateWins();
     updateStatus();
     draw();
     if (mode === 'ai' && game.currentPlayer !== humanColor) scheduleAI();
@@ -452,12 +496,17 @@
 
   function undoMove() {
     if (!canUndo()) return;
-    if (mode === 'pvp') {
+    if (gameType === 'go') {
+      game.undo();
+      if (mode === 'ai' && game.currentPlayer !== humanColor && game.moves.length > 0) {
+        game.undo();
+      }
+    } else if (mode === 'pvp') {
       game.undo(1);
     } else {
-      game.undo(1); // 撤掉最近一手（电脑或玩家）
+      game.undo(1);
       if (game.currentPlayer !== humanColor && game.moves.length > 0) {
-        game.undo(1); // 再撤玩家一手
+        game.undo(1);
       }
     }
     playSound('place');
@@ -476,9 +525,14 @@
 
   // ---------- 状态与界面 ----------
   function updateWins() {
-    blackWinsEl.textContent = wins[BLACK];
-    whiteWinsEl.textContent = wins[WHITE];
-    drawsEl.textContent = wins.draw;
+    if (gameType === 'go') {
+      goBlackCapturesEl.textContent = game.captures[BLACK];
+      goWhiteCapturesEl.textContent = game.captures[WHITE];
+    } else {
+      blackWinsEl.textContent = wins[BLACK];
+      whiteWinsEl.textContent = wins[WHITE];
+      drawsEl.textContent = wins.draw;
+    }
   }
 
   function updateStatus() {
@@ -490,8 +544,12 @@
       if (game.winner === 0) {
         stone.className = 'stone stone-empty';
         text = '平局';
-        msg = '棋盘已满，双方不分胜负';
+        msg = gameType === 'go' ? '双方虚着，数子结果不分胜负' : '棋盘已满，双方不分胜负';
       } else {
+        if (gameType === 'go' && game.scoreResult) {
+          const s = game.scoreResult;
+          msg = '数子结果：黑 ' + s.black + ' 子 vs 白 ' + s.white + ' 子（含贴目 ' + s.komi + '）';
+        }
         const colorName = game.winner === BLACK ? '先手方' : '后手方';
         stone.className = 'stone'; applyStoneStyle(stone, game.winner);
         if (mode === 'ai') {
@@ -569,7 +627,7 @@
     sizeButtons.forEach(function (btn) {
       btn.classList.toggle('active', parseInt(btn.getAttribute('data-size'), 10) === n);
     });
-    game = new GomokuGame();
+    game = gameType === 'go' ? new GoGame(n) : new GomokuGame();
     hover = null;
     updateStatus();
     draw();
@@ -584,6 +642,67 @@
     if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; thinking = false; }
     applyBoardSize(n, true);
   }
+  // ---------- 游戏类型切换 ----------
+  function switchGameType(type) {
+    if (gameType === type) return;
+    gameType = type;
+    if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; thinking = false; }
+    typeGomoku.classList.toggle('active', type === 'gomoku');
+    typeGo.classList.toggle('active', type === 'go');
+    gomokuSection.style.display = type === 'gomoku' ? '' : 'none';
+    goSection.style.display = type === 'go' ? '' : 'none';
+    gomokuScores.style.display = type === 'gomoku' ? '' : 'none';
+    goCapturesEl.style.display = type === 'go' ? '' : 'none';
+    passBtn.style.display = type === 'go' ? '' : 'none';
+    resignBtn.style.display = type === 'go' ? '' : 'none';
+    game = type === 'go' ? new GoGame(BOARD_SIZE) : new GomokuGame();
+    hover = null;
+    updateWins();
+    updateStatus();
+    draw();
+    if (mode === 'ai' && game.currentPlayer !== humanColor) scheduleAI();
+  }
+
+  function goHumanPass() {
+    if (game.gameOver || thinking) return;
+    if (mode === 'ai' && game.currentPlayer !== humanColor) return;
+    game.pass();
+    playSound('place');
+    updateStatus();
+    draw();
+    if (game.winner !== null) { onGameOver(); return; }
+    if (mode === 'ai') scheduleAI();
+  }
+
+  function goHumanResign() {
+    if (game.gameOver || thinking) return;
+    if (mode === 'ai' && game.currentPlayer !== humanColor) return;
+    game.resign(game.currentPlayer);
+    onGameOver();
+  }
+
+  function setGoMode(m) {
+    mode = m;
+    goModeAI.classList.toggle('active', m === 'ai');
+    goModePVP.classList.toggle('active', m === 'pvp');
+    goColorPick.style.display = m === 'ai' ? '' : 'none';
+    startGame();
+  }
+
+  function setGoHumanColor(color) {
+    humanColor = color;
+    goPickBlack.classList.toggle('active', color === BLACK);
+    goPickWhite.classList.toggle('active', color === WHITE);
+    startGame();
+  }
+  typeGomoku.addEventListener('click', function () { switchGameType('gomoku'); });
+  typeGo.addEventListener('click', function () { switchGameType('go'); });
+  passBtn.addEventListener('click', goHumanPass);
+  resignBtn.addEventListener('click', goHumanResign);
+  goModeAI.addEventListener('click', function () { setGoMode('ai'); });
+  goModePVP.addEventListener('click', function () { setGoMode('pvp'); });
+  goPickBlack.addEventListener('click', function () { setGoHumanColor(BLACK); });
+  goPickWhite.addEventListener('click', function () { setGoHumanColor(WHITE); });
   soundToggle.addEventListener('click', function () {
     soundOn = !soundOn;
     soundToggle.textContent = soundOn ? '🔊' : '🔇';

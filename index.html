@@ -17,7 +17,18 @@
       <aside class="panel">
         <section>
           <h2>娓告垙妯″紡</h2>
+        <section>
+          <h2>游戏类型</h2>
+          <div class="type-buttons">
+            <button id="typeGomoku" class="btn active">⚫ 五子棋</button>
+            <button id="typeGo" class="btn">⚪ 围棋</button>
+          </div>
+        </section>
+
+        <section id="gomokuSection">
+          <h2>游戏模式</h2>
           <div class="mode-buttons">
+
             <button id="modeAI" class="btn active">馃 浜烘満瀵规垬</button>
             <button id="modePVP" class="btn">馃懃 鍙屼汉瀵规垬</button>
           </div>
@@ -28,7 +39,22 @@
           </div>
         </section>
 
-        <section>
+                </section>
+
+        <section id="goSection" style="display:none">
+          <h2>游戏模式</h2>
+          <div class="mode-buttons">
+            <button id="goModeAI" class="btn active">🤖 人机对战</button>
+            <button id="goModePVP" class="btn">👥 双人对战</button>
+          </div>
+          <div class="color-pick" id="goColorPick">
+            <span>玩家执子：</span>
+            <button id="goPickBlack" class="btn small active">⚫ 黑子</button>
+            <button id="goPickWhite" class="btn small">⚪ 白子</button>
+          </div>
+        </section>
+
+<section>
           <h2>妫嬪瓙棰滆壊</h2>
           <div class="stone-color-row">
             <span class="color-label">鍏堟墜鏂?/span>
@@ -48,9 +74,13 @@
             <div class="stone stone-black" id="turnStone"></div>
             <span id="turnText">榛戞柟鍥炲悎</span>
           </div>
-          <div class="scores">
+          <div class="scores" id="gomokuScores">
             <div class="score-item"><span class="score-dot" id="scoreDotBlack"></span><b id="blackWins">0</b></div>
             <div class="score-item"><span class="score-dot" id="scoreDotWhite"></span><b id="whiteWins">0</b></div>
+          <div class="scores" id="goCaptures" style="display:none">
+            <div class="score-item">⚫ 提子<b id="goBlackCaptures">0</b></div>
+            <div class="score-item">⚪ 提子<b id="goWhiteCaptures">0</b></div>
+          </div>
             <div class="score-item">骞?b id="draws">0</b></div>
           </div>
           <p class="message" id="message">鐐瑰嚮妫嬬洏钀藉瓙锛屽厛杩炴垚浜斿瓙鑰呰儨</p>
@@ -58,6 +88,8 @@
 
         <section class="actions">
           <button id="undoBtn" class="btn">鈫?鎮旀</button>
+          <button id="passBtn" class="btn" style="display:none">⏭ 虚着</button>
+          <button id="resignBtn" class="btn" style="display:none">🏳 认输</button>
           <button id="restartBtn" class="btn primary">鉄?閲嶆柊寮€濮?/button>
         </section>
       </aside>
@@ -74,6 +106,8 @@
 
   <script src="js/game.js"></script>
   <script src="js/ai.js"></script>
+  <script src="js/go.js"></script>
+  <script src="js/go-ai.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
