@@ -1,8 +1,8 @@
-﻿/* 五子棋核心逻辑：棋盘、落子、胜负判定、悔棋 */
+/* 五子棋核心逻辑：棋盘、落子、胜负判定、悔棋 */
 (function (global) {
   'use strict';
 
-  const BOARD_SIZE = 15;
+  let BOARD_SIZE = 15;
   const EMPTY = 0;
   const BLACK = 1;
   const WHITE = 2;
@@ -86,5 +86,10 @@
     }
   }
 
-  global.GomokuGame = { GomokuGame, BOARD_SIZE, EMPTY, BLACK, WHITE };
+    function setBoardSize(n) {
+    BOARD_SIZE = n;
+    global.GomokuGame.BOARD_SIZE = n;
+  }
+
+  global.GomokuGame = { GomokuGame, BOARD_SIZE, EMPTY, BLACK, WHITE, setBoardSize };
 })(window);

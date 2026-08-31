@@ -1,8 +1,9 @@
-﻿/* 五子棋 AI：基于棋型评分 + 1 层安全检查的启发式算法 */
+/* 五子棋 AI：基于棋型评分 + 1 层安全检查的启发式算法 */
 (function (global) {
   'use strict';
 
-  const { BOARD_SIZE, EMPTY, BLACK, WHITE } = global.GomokuGame;
+  const { EMPTY, BLACK, WHITE } = global.GomokuGame;
+  let BOARD_SIZE = global.GomokuGame.BOARD_SIZE;
 
   const DIRECTIONS = [[0, 1], [1, 0], [1, 1], [1, -1]];
 
@@ -125,8 +126,9 @@
   }
 
   function getBestMove(board, aiPlayer, humanPlayer) {
+    BOARD_SIZE = global.GomokuGame.BOARD_SIZE;
     const stones = countStones(board);
-    if (stones === 0) return { row: 7, col: 7 };
+    if (stones === 0) { const center = Math.floor(BOARD_SIZE / 2); return { row: center, col: center }; }
 
     const winningMoves = []; // AI 连五直接获胜的点
     const blockMoves = [];   // 必须堵住的对手连五点

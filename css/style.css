@@ -60,6 +60,9 @@ body {
 .color-pick { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
 .color-pick .btn { flex: 1; min-width: 84px; }
 
+.board-size-pick { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.board-size-pick .btn { padding: 6px 8px; font-size: 12px; min-width: 0; flex: 0; }
+
 .stone-color-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .stone-color-row:first-of-type { margin-top: 0; }
 .color-label { font-size: 13px; color: var(--muted); min-width: 44px; flex-shrink: 0; }

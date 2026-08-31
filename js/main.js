@@ -2,27 +2,29 @@
 (function () {
   'use strict';
 
-  const { GomokuGame, BOARD_SIZE, EMPTY, BLACK, WHITE } = window.GomokuGame;
+  const { GomokuGame, EMPTY, BLACK, WHITE } = window.GomokuGame;
+  let BOARD_SIZE = window.GomokuGame.BOARD_SIZE;
   const { getBestMove } = window.GomokuAI;
 
   // ---------- 画布 ----------
   const canvas = document.getElementById('boardCanvas');
   const ctx = canvas.getContext('2d');
 
-  const CELL = 42;
-  const PAD = 30;
-  const SIZE = PAD * 2 + CELL * (BOARD_SIZE - 1); // 648
+  let CELL = 42;
+  let PAD = 30;
+  let SIZE = PAD * 2 + CELL * (BOARD_SIZE - 1);
 
   const DPR = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.round(SIZE * DPR);
-  canvas.height = Math.round(SIZE * DPR);
-  ctx.scale(DPR, DPR);
 
   // ---------- 木纹背景（一次性离屏绘制） ----------
   const bgCanvas = document.createElement('canvas');
-  bgCanvas.width = SIZE;
-  bgCanvas.height = SIZE;
-  (function renderBg() {
+  function renderBackground() {
+    canvas.width = Math.round(SIZE * DPR);
+    canvas.height = Math.round(SIZE * DPR);
+    canvas.style.maxWidth = SIZE + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    bgCanvas.width = SIZE;
+    bgCanvas.height = SIZE;
     const b = bgCanvas.getContext('2d');
     const g = b.createLinearGradient(0, 0, SIZE, SIZE);
     g.addColorStop(0, '#e9c184');
@@ -45,7 +47,8 @@
     vg.addColorStop(1, 'rgba(0,0,0,0.16)');
     b.fillStyle = vg;
     b.fillRect(0, 0, SIZE, SIZE);
-  })();
+  }
+  renderBackground();
 
   // ---------- 页面元素 ----------
   const turnStone = document.getElementById('turnStone');
@@ -237,6 +240,14 @@
   }
 
   // ---------- 绘制 ----------
+  function getStarPositions(n) {
+    const center = Math.floor(n / 2);
+    if (n < 13) return [[center, center]];
+    const edge = 3;
+    const far = n - 1 - edge;
+    return [[edge, edge], [edge, far], [far, edge], [far, far], [center, center]];
+  }
+
   function draw() {
     ctx.drawImage(bgCanvas, 0, 0);
 
@@ -257,7 +268,7 @@
 
     // 星位
     ctx.fillStyle = 'rgba(74, 47, 20, 0.9)';
-    const stars = [[3, 3], [3, 11], [11, 3], [11, 11], [7, 7]];
+    const stars = getStarPositions(BOARD_SIZE);
     for (const [r, c] of stars) {
       ctx.beginPath();
       ctx.arc(PAD + c * CELL, PAD + r * CELL, 4, 0, Math.PI * 2);
@@ -536,6 +547,43 @@
   restartBtn.addEventListener('click', startGame);
   undoBtn.addEventListener('click', undoMove);
 
+  // ---------- 棋盘尺寸 ----------
+  const sizeButtons = document.querySelectorAll('.size-btn');
+
+  function initBoardSize() {
+    let saved = parseInt(localStorage.getItem('gomoku_board_size'), 10);
+    if (!saved || [9, 13, 15, 19].indexOf(saved) === -1) saved = 15;
+    applyBoardSize(saved, false);
+    sizeButtons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        changeBoardSize(parseInt(this.getAttribute('data-size'), 10));
+      });
+    });
+  }
+
+  function applyBoardSize(n, persist) {
+    BOARD_SIZE = n;
+    window.GomokuGame.setBoardSize(n);
+    SIZE = PAD * 2 + CELL * (BOARD_SIZE - 1);
+    renderBackground();
+    sizeButtons.forEach(function (btn) {
+      btn.classList.toggle('active', parseInt(btn.getAttribute('data-size'), 10) === n);
+    });
+    game = new GomokuGame();
+    hover = null;
+    updateStatus();
+    draw();
+    if (persist) {
+      localStorage.setItem('gomoku_board_size', String(n));
+      if (mode === 'ai' && game.currentPlayer !== humanColor) scheduleAI();
+    }
+  }
+
+  function changeBoardSize(n) {
+    if (n === BOARD_SIZE) return;
+    if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; thinking = false; }
+    applyBoardSize(n, true);
+  }
   soundToggle.addEventListener('click', function () {
     soundOn = !soundOn;
     soundToggle.textContent = soundOn ? '🔊' : '🔇';
@@ -547,6 +595,7 @@
 
   // ---------- 启动 ----------
   initColorPickers();
+  initBoardSize();
   updateWins();
   updateStatus();
   draw();
