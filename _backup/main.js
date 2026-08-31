@@ -1,8 +1,9 @@
-﻿/* 五子棋界面：Canvas 渲染、交互、人机/双人模式 */
+/* 五子棋界面：Canvas 渲染、交互、人机/双人模式 */
 (function () {
   'use strict';
 
-  const { GomokuGame, BOARD_SIZE, EMPTY, BLACK, WHITE } = window.GomokuGame;
+  const { GomokuGame, EMPTY, BLACK, WHITE } = window.GomokuGame;
+  let BOARD_SIZE = window.GomokuGame.BOARD_SIZE;
   const { getBestMove } = window.GomokuAI;
   const { GoGame } = window.GoGame;
   const { getGoMove } = window.GoAI;
@@ -19,7 +20,6 @@
 
   // ---------- 木纹背景（一次性离屏绘制） ----------
   const bgCanvas = document.createElement('canvas');
-
   function renderBackground() {
     canvas.width = Math.round(SIZE * DPR);
     canvas.height = Math.round(SIZE * DPR);
@@ -84,7 +84,7 @@
   const resignBtn = document.getElementById('resignBtn');
 
   // ---------- 状态 ----------
-  let gameType = 'gomoku';
+  let gameType = 'gomoku';  // 'gomoku' | 'go'
   let mode = 'ai';          // 'ai' | 'pvp'
   let humanColor = BLACK;   // 玩家执黑/执白
   let game = new GomokuGame();
@@ -119,16 +119,26 @@
 
   function hexToRgb(hex) {
     const h = hex.replace('#', '');
-    return { r: parseInt(h.substring(0, 2), 16), g: parseInt(h.substring(2, 4), 16), b: parseInt(h.substring(4, 6), 16) };
+    return {
+      r: parseInt(h.substring(0, 2), 16),
+      g: parseInt(h.substring(2, 4), 16),
+      b: parseInt(h.substring(4, 6), 16)
+    };
   }
 
   function rgbToHex(rgb) {
-    return '#' + [rgb.r, rgb.g, rgb.b].map(function (v) { return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0'); }).join('');
+    return '#' + [rgb.r, rgb.g, rgb.b]
+      .map(function (v) { return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0'); })
+      .join('');
   }
 
   function lighten(hex, amount) {
     const rgb = hexToRgb(hex);
-    return rgbToHex({ r: rgb.r + (255 - rgb.r) * amount, g: rgb.g + (255 - rgb.g) * amount, b: rgb.b + (255 - rgb.b) * amount });
+    return rgbToHex({
+      r: rgb.r + (255 - rgb.r) * amount,
+      g: rgb.g + (255 - rgb.g) * amount,
+      b: rgb.b + (255 - rgb.b) * amount
+    });
   }
 
   function darken(hex, amount) {
@@ -136,7 +146,9 @@
     return rgbToHex({ r: rgb.r * (1 - amount), g: rgb.g * (1 - amount), b: rgb.b * (1 - amount) });
   }
 
-  function stoneGradient(hex) { return { light: lighten(hex, 0.35), mid: hex, dark: darken(hex, 0.35) }; }
+  function stoneGradient(hex) {
+    return { light: lighten(hex, 0.35), mid: hex, dark: darken(hex, 0.35) };
+  }
 
   function isLightColor(hex) {
     const rgb = hexToRgb(hex);
@@ -154,6 +166,56 @@
       el.style.border = 'none';
       el.style.boxShadow = '0 2px 6px rgba(0,0,0,0.5)';
     }
+  }
+
+  function initColorPickers() {
+    const groupBlack = document.getElementById('swatchGroupBlack');
+    const groupWhite = document.getElementById('swatchGroupWhite');
+    const customBlack = document.getElementById('customColorBlack');
+    const customWhite = document.getElementById('customColorWhite');
+
+    [groupBlack, groupWhite].forEach(function (group, idx) {
+      const player = idx === 0 ? 1 : 2;
+      PRESET_COLORS.forEach(function (hex) {
+        const btn = document.createElement('button');
+        btn.className = 'swatch';
+        btn.style.background = hex;
+        btn.setAttribute('data-color', hex);
+        btn.setAttribute('data-player', player);
+        btn.title = hex;
+        group.appendChild(btn);
+      });
+    });
+
+    groupBlack.addEventListener('click', function (e) {
+      if (e.target.classList.contains('swatch')) setStoneColor(1, e.target.getAttribute('data-color'));
+    });
+    groupWhite.addEventListener('click', function (e) {
+      if (e.target.classList.contains('swatch')) setStoneColor(2, e.target.getAttribute('data-color'));
+    });
+    customBlack.addEventListener('input', function () { setStoneColor(1, this.value); });
+    customWhite.addEventListener('input', function () { setStoneColor(2, this.value); });
+
+    refreshSwatchActive();
+  }
+
+  function setStoneColor(player, hex) {
+    stoneColors[player] = hex;
+    saveStoneColors();
+    refreshSwatchActive();
+    draw();
+    updateStatus();
+  }
+
+  function refreshSwatchActive() {
+    document.querySelectorAll('.swatch').forEach(function (btn) {
+      const player = parseInt(btn.getAttribute('data-player'));
+      btn.classList.toggle('active', btn.getAttribute('data-color') === stoneColors[player]);
+    });
+    document.getElementById('customColorBlack').value = stoneColors[1];
+    document.getElementById('customColorWhite').value = stoneColors[2];
+    applyStoneStyle(document.getElementById('scoreDotBlack'), 1);
+    applyStoneStyle(document.getElementById('scoreDotWhite'), 2);
   }
 
   // ---------- 音频 ----------
@@ -196,6 +258,14 @@
   }
 
   // ---------- 绘制 ----------
+  function getStarPositions(n) {
+    const center = Math.floor(n / 2);
+    if (n < 13) return [[center, center]];
+    const edge = 3;
+    const far = n - 1 - edge;
+    return [[edge, edge], [edge, far], [far, edge], [far, far], [center, center]];
+  }
+
   function draw() {
     ctx.drawImage(bgCanvas, 0, 0);
 
@@ -274,14 +344,6 @@
       ctx.stroke();
       for (const p of line) drawRing(p.row, p.col, '#eb4c4c');
     }
-  }
-
-  function getStarPositions(n) {
-    const center = Math.floor(n / 2);
-    if (n < 13) return [[center, center]];
-    const edge = 3;
-    const far = n - 1 - edge;
-    return [[edge, edge], [edge, far], [far, edge], [far, far], [center, center]];
   }
 
   function drawStone(r, c, color, alpha) {
@@ -426,6 +488,7 @@
     game = gameType === 'go' ? new GoGame(BOARD_SIZE) : new GomokuGame();
     thinking = false;
     hover = null;
+    updateWins();
     updateStatus();
     draw();
     if (mode === 'ai' && game.currentPlayer !== humanColor) scheduleAI();
@@ -433,12 +496,17 @@
 
   function undoMove() {
     if (!canUndo()) return;
-    if (mode === 'pvp') {
+    if (gameType === 'go') {
+      game.undo();
+      if (mode === 'ai' && game.currentPlayer !== humanColor && game.moves.length > 0) {
+        game.undo();
+      }
+    } else if (mode === 'pvp') {
       game.undo(1);
     } else {
-      game.undo(1); // 撤掉最近一手（电脑或玩家）
+      game.undo(1);
       if (game.currentPlayer !== humanColor && game.moves.length > 0) {
-        game.undo(1); // 再撤玩家一手
+        game.undo(1);
       }
     }
     playSound('place');
@@ -476,13 +544,13 @@
       if (game.winner === 0) {
         stone.className = 'stone stone-empty';
         text = '平局';
-        msg = '棋盘已满，双方不分胜负';
+        msg = gameType === 'go' ? '双方虚着，数子结果不分胜负' : '棋盘已满，双方不分胜负';
       } else {
         if (gameType === 'go' && game.scoreResult) {
           const s = game.scoreResult;
           msg = '数子结果：黑 ' + s.black + ' 子 vs 白 ' + s.white + ' 子（含贴目 ' + s.komi + '）';
         }
-        const colorName = game.winner === BLACK ? '黑方' : '白方';
+        const colorName = game.winner === BLACK ? '先手方' : '后手方';
         stone.className = 'stone'; applyStoneStyle(stone, game.winner);
         if (mode === 'ai') {
           const humanWon = game.winner === humanColor;
@@ -495,13 +563,13 @@
       }
     } else {
       const isHumanTurn = mode !== 'ai' || game.currentPlayer === humanColor;
-      const colorName = game.currentPlayer === BLACK ? '黑方' : '白方';
+      const colorName = game.currentPlayer === BLACK ? '先手方' : '后手方';
       stone.className = 'stone'; applyStoneStyle(stone, game.currentPlayer);
       stone.classList.toggle('thinking', !isHumanTurn);
       if (mode === 'ai') {
         text = isHumanTurn ? '你的回合' : '电脑思考中…';
         msg = isHumanTurn
-          ? '你执' + (game.currentPlayer === BLACK ? '黑棋' : '白棋') + '，请点击棋盘落子'
+          ? '请点击棋盘落子'
           : '请稍候，电脑正在计算…';
       } else {
         text = colorName + '回合';
@@ -561,7 +629,6 @@
     });
     game = gameType === 'go' ? new GoGame(n) : new GomokuGame();
     hover = null;
-    updateWins();
     updateStatus();
     draw();
     if (persist) {
@@ -575,7 +642,6 @@
     if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; thinking = false; }
     applyBoardSize(n, true);
   }
-
   // ---------- 游戏类型切换 ----------
   function switchGameType(type) {
     if (gameType === type) return;
@@ -629,7 +695,6 @@
     goPickWhite.classList.toggle('active', color === WHITE);
     startGame();
   }
-
   typeGomoku.addEventListener('click', function () { switchGameType('gomoku'); });
   typeGo.addEventListener('click', function () { switchGameType('go'); });
   passBtn.addEventListener('click', goHumanPass);
@@ -638,58 +703,6 @@
   goModePVP.addEventListener('click', function () { setGoMode('pvp'); });
   goPickBlack.addEventListener('click', function () { setGoHumanColor(BLACK); });
   goPickWhite.addEventListener('click', function () { setGoHumanColor(WHITE); });
-
-  // ---------- 颜色选择器 ----------
-  function initColorPickers() {
-    const groupBlack = document.getElementById('swatchGroupBlack');
-    const groupWhite = document.getElementById('swatchGroupWhite');
-    const customBlack = document.getElementById('customColorBlack');
-    const customWhite = document.getElementById('customColorWhite');
-
-    [groupBlack, groupWhite].forEach(function (group, idx) {
-      const player = idx === 0 ? 1 : 2;
-      PRESET_COLORS.forEach(function (hex) {
-        const btn = document.createElement('button');
-        btn.className = 'swatch';
-        btn.style.background = hex;
-        btn.setAttribute('data-color', hex);
-        btn.setAttribute('data-player', player);
-        btn.title = hex;
-        group.appendChild(btn);
-      });
-    });
-
-    groupBlack.addEventListener('click', function (e) {
-      if (e.target.classList.contains('swatch')) setStoneColor(1, e.target.getAttribute('data-color'));
-    });
-    groupWhite.addEventListener('click', function (e) {
-      if (e.target.classList.contains('swatch')) setStoneColor(2, e.target.getAttribute('data-color'));
-    });
-    customBlack.addEventListener('input', function () { setStoneColor(1, this.value); });
-    customWhite.addEventListener('input', function () { setStoneColor(2, this.value); });
-
-    refreshSwatchActive();
-  }
-
-  function setStoneColor(player, hex) {
-    stoneColors[player] = hex;
-    saveStoneColors();
-    refreshSwatchActive();
-    draw();
-    updateStatus();
-  }
-
-  function refreshSwatchActive() {
-    document.querySelectorAll('.swatch').forEach(function (btn) {
-      const player = parseInt(btn.getAttribute('data-player'));
-      btn.classList.toggle('active', btn.getAttribute('data-color') === stoneColors[player]);
-    });
-    document.getElementById('customColorBlack').value = stoneColors[1];
-    document.getElementById('customColorWhite').value = stoneColors[2];
-    applyStoneStyle(document.getElementById('scoreDotBlack'), 1);
-    applyStoneStyle(document.getElementById('scoreDotWhite'), 2);
-  }
-
   soundToggle.addEventListener('click', function () {
     soundOn = !soundOn;
     soundToggle.textContent = soundOn ? '🔊' : '🔇';

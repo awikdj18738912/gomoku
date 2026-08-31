@@ -3,18 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>五子棋 · Gomoku</title>
+  <title>浜斿瓙妫?路 Gomoku</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <div class="app">
     <header class="header">
-      <h1>五子棋 <span class="sub">GOMOKU</span></h1>
-      <button class="sound-toggle" id="soundToggle" title="开关音效" aria-label="开关音效">🔊</button>
+      <h1>浜斿瓙妫?<span class="sub">GOMOKU</span></h1>
+      <button class="sound-toggle" id="soundToggle" title="寮€鍏抽煶鏁? aria-label="寮€鍏抽煶鏁?>馃攰</button>
     </header>
 
     <main class="main">
       <aside class="panel">
+        <section>
+          <h2>娓告垙妯″紡</h2>
         <section>
           <h2>游戏类型</h2>
           <div class="type-buttons">
@@ -25,23 +27,19 @@
 
         <section id="gomokuSection">
           <h2>游戏模式</h2>
-          <div class="board-size-pick">
-            <span>棋盘：</span>
-            <button class="btn small size-btn" data-size="9">9×9</button>
-            <button class="btn small size-btn" data-size="13">13×13</button>
-            <button class="btn small size-btn active" data-size="15">15×15</button>
-            <button class="btn small size-btn" data-size="19">19×19</button>
-          </div>
           <div class="mode-buttons">
-            <button id="modeAI" class="btn active">🤖 人机对战</button>
-            <button id="modePVP" class="btn">👥 双人对战</button>
+
+            <button id="modeAI" class="btn active">馃 浜烘満瀵规垬</button>
+            <button id="modePVP" class="btn">馃懃 鍙屼汉瀵规垬</button>
           </div>
           <div class="color-pick" id="colorPick">
-            <span>玩家执子：</span>
-            <button id="pickBlack" class="btn small active">⚫ 黑子</button>
-            <button id="pickWhite" class="btn small">⚪ 白子</button>
+            <span>鐜╁鎵у瓙锛?/span>
+            <button id="pickBlack" class="btn small active">鈿?榛戝瓙</button>
+            <button id="pickWhite" class="btn small">鈿?鐧藉瓙</button>
           </div>
         </section>
+
+                </section>
 
         <section id="goSection" style="display:none">
           <h2>游戏模式</h2>
@@ -56,53 +54,53 @@
           </div>
         </section>
 
-        <section>
-          <h2>棋子颜色</h2>
+<section>
+          <h2>妫嬪瓙棰滆壊</h2>
           <div class="stone-color-row">
-            <span class="color-label">先手方</span>
+            <span class="color-label">鍏堟墜鏂?/span>
             <div class="swatch-group" id="swatchGroupBlack"></div>
-            <input type="color" class="custom-color" id="customColorBlack" value="#1a1a1a" title="自定义颜色" />
+            <input type="color" class="custom-color" id="customColorBlack" value="#1a1a1a" title="鑷畾涔夐鑹? />
           </div>
           <div class="stone-color-row">
-            <span class="color-label">后手方</span>
+            <span class="color-label">鍚庢墜鏂?/span>
             <div class="swatch-group" id="swatchGroupWhite"></div>
-            <input type="color" class="custom-color" id="customColorWhite" value="#f5f5f5" title="自定义颜色" />
+            <input type="color" class="custom-color" id="customColorWhite" value="#f5f5f5" title="鑷畾涔夐鑹? />
           </div>
         </section>
 
         <section>
-          <h2>当前局面</h2>
+          <h2>褰撳墠灞€闈?/h2>
           <div class="turn-indicator">
             <div class="stone stone-black" id="turnStone"></div>
-            <span id="turnText">黑方回合</span>
+            <span id="turnText">榛戞柟鍥炲悎</span>
           </div>
           <div class="scores" id="gomokuScores">
             <div class="score-item"><span class="score-dot" id="scoreDotBlack"></span><b id="blackWins">0</b></div>
             <div class="score-item"><span class="score-dot" id="scoreDotWhite"></span><b id="whiteWins">0</b></div>
-            <div class="score-item">平<b id="draws">0</b></div>
-          </div>
           <div class="scores" id="goCaptures" style="display:none">
             <div class="score-item">⚫ 提子<b id="goBlackCaptures">0</b></div>
             <div class="score-item">⚪ 提子<b id="goWhiteCaptures">0</b></div>
           </div>
-          <p class="message" id="message">点击棋盘落子，先连成五子者胜</p>
+            <div class="score-item">骞?b id="draws">0</b></div>
+          </div>
+          <p class="message" id="message">鐐瑰嚮妫嬬洏钀藉瓙锛屽厛杩炴垚浜斿瓙鑰呰儨</p>
         </section>
 
         <section class="actions">
-          <button id="undoBtn" class="btn">↩ 悔棋</button>
+          <button id="undoBtn" class="btn">鈫?鎮旀</button>
           <button id="passBtn" class="btn" style="display:none">⏭ 虚着</button>
           <button id="resignBtn" class="btn" style="display:none">🏳 认输</button>
-          <button id="restartBtn" class="btn primary">⟳ 重新开始</button>
+          <button id="restartBtn" class="btn primary">鉄?閲嶆柊寮€濮?/button>
         </section>
       </aside>
 
       <section class="board-wrap">
-        <canvas id="boardCanvas" role="img" aria-label="五子棋棋盘"></canvas>
+        <canvas id="boardCanvas" role="img" aria-label="浜斿瓙妫嬫鐩?></canvas>
       </section>
     </main>
 
     <footer class="footer">
-      <p>横、竖、斜任意方向先连成五子的一方获胜 · 人机模式下点"悔棋"可同时回退电脑一步</p>
+      <p>妯€佺珫銆佹枩浠绘剰鏂瑰悜鍏堣繛鎴愪簲瀛愮殑涓€鏂硅幏鑳?路 浜烘満妯″紡涓嬬偣鈥滄倲妫嬧€濆彲鍚屾椂鍥為€€鐢佃剳涓€姝?/p>
     </footer>
   </div>
 
