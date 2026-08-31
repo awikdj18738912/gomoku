@@ -1,0 +1,65 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>五子棋 · Gomoku</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>五子棋 <span class="sub">GOMOKU</span></h1>
+      <button class="sound-toggle" id="soundToggle" title="开关音效" aria-label="开关音效">🔊</button>
+    </header>
+
+    <main class="main">
+      <aside class="panel">
+        <section>
+          <h2>游戏模式</h2>
+          <div class="mode-buttons">
+            <button id="modeAI" class="btn active">🤖 人机对战</button>
+            <button id="modePVP" class="btn">👥 双人对战</button>
+          </div>
+          <div class="color-pick" id="colorPick">
+            <span>玩家执子：</span>
+            <button id="pickBlack" class="btn small active">⚫ 黑子</button>
+            <button id="pickWhite" class="btn small">⚪ 白子</button>
+          </div>
+        </section>
+
+        <section>
+          <h2>当前局面</h2>
+          <div class="turn-indicator">
+            <div class="stone stone-black" id="turnStone"></div>
+            <span id="turnText">黑方回合</span>
+          </div>
+          <div class="scores">
+            <div class="score-item">⚫ 黑<b id="blackWins">0</b></div>
+            <div class="score-item">⚪ 白<b id="whiteWins">0</b></div>
+            <div class="score-item">平<b id="draws">0</b></div>
+          </div>
+          <p class="message" id="message">点击棋盘落子，先连成五子者胜</p>
+        </section>
+
+        <section class="actions">
+          <button id="undoBtn" class="btn">↩ 悔棋</button>
+          <button id="restartBtn" class="btn primary">⟳ 重新开始</button>
+        </section>
+      </aside>
+
+      <section class="board-wrap">
+        <canvas id="boardCanvas" role="img" aria-label="五子棋棋盘"></canvas>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>横、竖、斜任意方向先连成五子的一方获胜 · 人机模式下点“悔棋”可同时回退电脑一步</p>
+    </footer>
+  </div>
+
+  <script src="js/game.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

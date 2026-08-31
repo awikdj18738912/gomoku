@@ -1,0 +1,435 @@
+﻿/* 五子棋界面：Canvas 渲染、交互、人机/双人模式 */
+(function () {
+  'use strict';
+
+  const { GomokuGame, BOARD_SIZE, EMPTY, BLACK, WHITE } = window.GomokuGame;
+  const { getBestMove } = window.GomokuAI;
+
+  // ---------- 画布 ----------
+  const canvas = document.getElementById('boardCanvas');
+  const ctx = canvas.getContext('2d');
+
+  const CELL = 42;
+  const PAD = 30;
+  const SIZE = PAD * 2 + CELL * (BOARD_SIZE - 1); // 648
+
+  const DPR = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.round(SIZE * DPR);
+  canvas.height = Math.round(SIZE * DPR);
+  ctx.scale(DPR, DPR);
+
+  // ---------- 木纹背景（一次性离屏绘制） ----------
+  const bgCanvas = document.createElement('canvas');
+  bgCanvas.width = SIZE;
+  bgCanvas.height = SIZE;
+  (function renderBg() {
+    const b = bgCanvas.getContext('2d');
+    const g = b.createLinearGradient(0, 0, SIZE, SIZE);
+    g.addColorStop(0, '#e9c184');
+    g.addColorStop(0.5, '#dcaa62');
+    g.addColorStop(1, '#c8903f');
+    b.fillStyle = g;
+    b.fillRect(0, 0, SIZE, SIZE);
+    for (let y = 6; y < SIZE; y += 7) {
+      b.beginPath();
+      b.moveTo(0, y);
+      for (let x = 0; x <= SIZE; x += 8) {
+        b.lineTo(x, y + Math.sin(x * 0.03 + y * 0.012) * 2.5 + (Math.random() * 2 - 1));
+      }
+      b.strokeStyle = 'rgba(' + (105 + Math.floor(Math.random() * 18)) + ', 70, 28, 0.07)';
+      b.lineWidth = 1;
+      b.stroke();
+    }
+    const vg = b.createRadialGradient(SIZE / 2, SIZE / 2, SIZE * 0.3, SIZE / 2, SIZE / 2, SIZE * 0.75);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.16)');
+    b.fillStyle = vg;
+    b.fillRect(0, 0, SIZE, SIZE);
+  })();
+
+  // ---------- 页面元素 ----------
+  const turnStone = document.getElementById('turnStone');
+  const turnText = document.getElementById('turnText');
+  const messageEl = document.getElementById('message');
+  const blackWinsEl = document.getElementById('blackWins');
+  const whiteWinsEl = document.getElementById('whiteWins');
+  const drawsEl = document.getElementById('draws');
+  const undoBtn = document.getElementById('undoBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const modeAI = document.getElementById('modeAI');
+  const modePVP = document.getElementById('modePVP');
+  const pickBlack = document.getElementById('pickBlack');
+  const pickWhite = document.getElementById('pickWhite');
+  const colorPick = document.getElementById('colorPick');
+  const soundToggle = document.getElementById('soundToggle');
+
+  // ---------- 状态 ----------
+  let mode = 'ai';          // 'ai' | 'pvp'
+  let humanColor = BLACK;   // 玩家执黑/执白
+  let game = new GomokuGame();
+  let thinking = false;     // 电脑是否在思考
+  let hover = null;         // 悬停预览位置
+  let soundOn = true;
+  let wins = {};
+  wins[BLACK] = 0;
+  wins[WHITE] = 0;
+  wins.draw = 0;
+  let aiTimer = null;
+
+  // ---------- 音频 ----------
+  let audioCtx = null;
+  function ensureAudio() {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function tone(freq, start, dur, vol, type) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    const t0 = audioCtx.currentTime + start;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.05);
+  }
+  function playSound(kind) {
+    if (!soundOn) return;
+    ensureAudio();
+    if (!audioCtx) return;
+    if (kind === 'place') {
+      tone(420, 0, 0.12, 0.22, 'triangle');
+    } else if (kind === 'win') {
+      tone(523.25, 0, 0.18, 0.18, 'sine');
+      tone(659.25, 0.15, 0.18, 0.18, 'sine');
+      tone(783.99, 0.3, 0.35, 0.18, 'sine');
+    } else if (kind === 'error') {
+      tone(160, 0, 0.15, 0.15, 'square');
+    }
+  }
+
+  // ---------- 绘制 ----------
+  function draw() {
+    ctx.drawImage(bgCanvas, 0, 0);
+
+    // 网格线
+    ctx.strokeStyle = 'rgba(74, 47, 20, 0.75)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      const p = PAD + i * CELL;
+      ctx.beginPath();
+      ctx.moveTo(PAD, p);
+      ctx.lineTo(SIZE - PAD, p);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(p, PAD);
+      ctx.lineTo(p, SIZE - PAD);
+      ctx.stroke();
+    }
+
+    // 星位
+    ctx.fillStyle = 'rgba(74, 47, 20, 0.9)';
+    const stars = [[3, 3], [3, 11], [11, 3], [11, 11], [7, 7]];
+    for (const [r, c] of stars) {
+      ctx.beginPath();
+      ctx.arc(PAD + c * CELL, PAD + r * CELL, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 棋子
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        const v = game.board[r][c];
+        if (v !== EMPTY) drawStone(r, c, v);
+      }
+    }
+
+    // 最后一手标记
+    if (game.lastMove) {
+      drawMark(game.lastMove.row, game.lastMove.col, 'rgba(220, 60, 60, 0.95)');
+    }
+
+    // 悬停预览
+    if (hover && game.winner === null && !thinking) {
+      if (game.board[hover.row][hover.col] === EMPTY) {
+        const color = mode === 'ai' ? humanColor : game.currentPlayer;
+        drawStone(hover.row, hover.col, color, 0.45);
+      }
+    }
+
+    // 获胜连线
+    if (game.winningLine) {
+      const line = game.winningLine.line;
+      ctx.strokeStyle = 'rgba(235, 76, 76, 0.9)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      line.forEach(function (p, i) {
+        const x = PAD + p.col * CELL;
+        const y = PAD + p.row * CELL;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      for (const p of line) drawRing(p.row, p.col, '#eb4c4c');
+    }
+  }
+
+  function drawStone(r, c, color, alpha) {
+    if (alpha === undefined) alpha = 1;
+    const x = PAD + c * CELL;
+    const y = PAD + r * CELL;
+    const radius = CELL * 0.44;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    const grad = ctx.createRadialGradient(x - radius * 0.35, y - radius * 0.4, radius * 0.15, x, y, radius);
+    if (color === BLACK) {
+      grad.addColorStop(0, '#7a7a7a');
+      grad.addColorStop(0.35, '#3a3a3a');
+      grad.addColorStop(1, '#0a0a0a');
+    } else {
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.6, '#f0f0f0');
+      grad.addColorStop(1, '#c2c2c2');
+    }
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = color === BLACK ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawMark(r, c, color) {
+    const x = PAD + c * CELL;
+    const y = PAD + r * CELL;
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  function drawRing(r, c, color) {
+    const x = PAD + c * CELL;
+    const y = PAD + r * CELL;
+    ctx.beginPath();
+    ctx.arc(x, y, CELL * 0.5, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+
+  // ---------- 交互 ----------
+  function cellFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (SIZE / rect.width);
+    const y = (e.clientY - rect.top) * (SIZE / rect.height);
+    const col = Math.round((x - PAD) / CELL);
+    const row = Math.round((y - PAD) / CELL);
+    if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) return null;
+    if (Math.abs(x - (PAD + col * CELL)) > CELL / 2) return null;
+    if (Math.abs(y - (PAD + row * CELL)) > CELL / 2) return null;
+    return { row, col };
+  }
+
+  canvas.addEventListener('click', function (e) {
+    const cell = cellFromEvent(e);
+    if (!cell) return;
+    if (game.winner !== null || thinking) return;
+    if (mode === 'ai' && game.currentPlayer !== humanColor) return;
+    if (game.board[cell.row][cell.col] !== EMPTY) {
+      playSound('error');
+      return;
+    }
+    humanMove(cell.row, cell.col);
+  });
+
+  canvas.addEventListener('mousemove', function (e) {
+    const cell = cellFromEvent(e);
+    if ((hover && cell && hover.row === cell.row && hover.col === cell.col) || (!hover && !cell)) return;
+    hover = cell;
+    draw();
+  });
+
+  canvas.addEventListener('mouseleave', function () {
+    if (hover) {
+      hover = null;
+      draw();
+    }
+  });
+
+  // ---------- 游戏流程 ----------
+  function humanMove(row, col) {
+    const move = game.place(row, col);
+    if (!move) return;
+    playSound('place');
+    updateStatus();
+    draw();
+    if (game.winner !== null) {
+      onGameOver();
+      return;
+    }
+    if (mode === 'ai') scheduleAI();
+  }
+
+  function scheduleAI() {
+    thinking = true;
+    updateStatus();
+    aiTimer = setTimeout(aiMove, 320);
+  }
+
+  function aiMove() {
+    thinking = false;
+    aiTimer = null;
+    if (game.winner !== null) return;
+    const aiPlayer = game.currentPlayer;
+    const best = getBestMove(game.board, aiPlayer, humanColor);
+    const move = game.place(best.row, best.col);
+    if (!move) return;
+    playSound('place');
+    updateStatus();
+    draw();
+    if (game.winner !== null) onGameOver();
+  }
+
+  function onGameOver() {
+    playSound('win');
+    if (game.winner === BLACK) wins[BLACK]++;
+    else if (game.winner === WHITE) wins[WHITE]++;
+    else wins.draw++;
+    updateWins();
+    updateStatus();
+  }
+
+  function startGame() {
+    if (aiTimer) {
+      clearTimeout(aiTimer);
+      aiTimer = null;
+    }
+    game = new GomokuGame();
+    thinking = false;
+    hover = null;
+    updateStatus();
+    draw();
+    if (mode === 'ai' && game.currentPlayer !== humanColor) scheduleAI();
+  }
+
+  function undoMove() {
+    if (!canUndo()) return;
+    if (mode === 'pvp') {
+      game.undo(1);
+    } else {
+      game.undo(1); // 撤掉最近一手（电脑或玩家）
+      if (game.currentPlayer !== humanColor && game.moves.length > 0) {
+        game.undo(1); // 再撤玩家一手
+      }
+    }
+    playSound('place');
+    updateStatus();
+    draw();
+    if (mode === 'ai' && game.currentPlayer !== humanColor && game.winner === null) {
+      scheduleAI();
+    }
+  }
+
+  function canUndo() {
+    if (thinking || game.winner !== null || game.moves.length === 0) return false;
+    if (mode === 'ai') return game.currentPlayer === humanColor;
+    return true;
+  }
+
+  // ---------- 状态与界面 ----------
+  function updateWins() {
+    blackWinsEl.textContent = wins[BLACK];
+    whiteWinsEl.textContent = wins[WHITE];
+    drawsEl.textContent = wins.draw;
+  }
+
+  function updateStatus() {
+    const stone = turnStone;
+    let text = '';
+    let msg = '';
+
+    if (game.winner !== null) {
+      if (game.winner === 0) {
+        stone.className = 'stone stone-empty';
+        text = '平局';
+        msg = '棋盘已满，双方不分胜负';
+      } else {
+        const colorName = game.winner === BLACK ? '黑方' : '白方';
+        stone.className = 'stone ' + (game.winner === BLACK ? 'stone-black' : 'stone-white');
+        if (mode === 'ai') {
+          const humanWon = game.winner === humanColor;
+          text = humanWon ? '🎉 你赢了！' : '🤖 电脑获胜';
+          msg = humanWon ? '恭喜！你执' + colorName + '率先连成五子' : '电脑执' + colorName + '率先连成五子，再来一局？';
+        } else {
+          text = '🎉 ' + colorName + '获胜！';
+          msg = colorName + '率先连成五子，恭喜！';
+        }
+      }
+    } else {
+      const isHumanTurn = mode !== 'ai' || game.currentPlayer === humanColor;
+      const colorName = game.currentPlayer === BLACK ? '黑方' : '白方';
+      stone.className = 'stone ' + (game.currentPlayer === BLACK ? 'stone-black' : 'stone-white');
+      stone.classList.toggle('thinking', !isHumanTurn);
+      if (mode === 'ai') {
+        text = isHumanTurn ? '你的回合' : '电脑思考中…';
+        msg = isHumanTurn
+          ? '你执' + (game.currentPlayer === BLACK ? '黑棋' : '白棋') + '，请点击棋盘落子'
+          : '请稍候，电脑正在计算…';
+      } else {
+        text = colorName + '回合';
+        msg = '请' + colorName + '落子';
+      }
+    }
+
+    turnText.textContent = text;
+    messageEl.textContent = msg;
+    undoBtn.disabled = !canUndo();
+  }
+
+  // ---------- 控件绑定 ----------
+  function setMode(m) {
+    mode = m;
+    modeAI.classList.toggle('active', m === 'ai');
+    modePVP.classList.toggle('active', m === 'pvp');
+    colorPick.style.display = m === 'ai' ? '' : 'none';
+    startGame();
+  }
+
+  function setHumanColor(color) {
+    humanColor = color;
+    pickBlack.classList.toggle('active', color === BLACK);
+    pickWhite.classList.toggle('active', color === WHITE);
+    startGame();
+  }
+
+  modeAI.addEventListener('click', function () { setMode('ai'); });
+  modePVP.addEventListener('click', function () { setMode('pvp'); });
+  pickBlack.addEventListener('click', function () { setHumanColor(BLACK); });
+  pickWhite.addEventListener('click', function () { setHumanColor(WHITE); });
+  restartBtn.addEventListener('click', startGame);
+  undoBtn.addEventListener('click', undoMove);
+
+  soundToggle.addEventListener('click', function () {
+    soundOn = !soundOn;
+    soundToggle.textContent = soundOn ? '🔊' : '🔇';
+    if (soundOn) {
+      ensureAudio();
+      playSound('place');
+    }
+  });
+
+  // ---------- 启动 ----------
+  updateWins();
+  updateStatus();
+  draw();
+})();

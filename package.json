@@ -1,0 +1,12 @@
+﻿{
+  "name": "gomoku",
+  "version": "1.0.0",
+  "description": "带前端的五子棋小游戏（人机对战 / 双人对战）",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/smoke.js"
+  },
+  "license": "MIT"
+}
